@@ -1,10 +1,8 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Heart, 
-  MessageCircle, 
   Share2, 
   Trash2, 
   SmilePlus, 
@@ -84,7 +82,6 @@ const PostCard = ({ post, refreshPosts, currentUser }: PostCardProps) => {
   };
 
   const handleShare = () => {
-    // Mock share functionality
     navigator.clipboard.writeText(`Check out this anonymous post: ${window.location.origin}/post/${post.id}`);
     toast.success("Link copied to clipboard!");
   };
@@ -132,11 +129,9 @@ const PostCard = ({ post, refreshPosts, currentUser }: PostCardProps) => {
       setIsLoading(true);
       const updatedPost = await addReaction(post.id, reactionType, currentUser.id);
       
-      // Check if the reaction was toggled on or off
       const newReaction = getUserReaction(post.id);
       setCurrentReaction(newReaction);
       
-      // Update the post with latest reactions
       post.reactions = updatedPost.reactions;
       
     } catch (error) {
@@ -157,7 +152,6 @@ const PostCard = ({ post, refreshPosts, currentUser }: PostCardProps) => {
     }
   };
 
-  // Hide own posts in incognito mode
   if (isOwnPost && isIncognito) {
     return null;
   }
@@ -301,15 +295,6 @@ const PostCard = ({ post, refreshPosts, currentUser }: PostCardProps) => {
             {likeCount}
           </Button>
           
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="rounded-full flex items-center"
-          >
-            <MessageCircle className="h-4 w-4 mr-1" />
-            {post.comments}
-          </Button>
-
           <Popover>
             <PopoverTrigger asChild>
               <Button 
