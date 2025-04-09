@@ -75,11 +75,16 @@ const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
       // Get current user
       const currentUser = await getCurrentUser();
       
+      if (!currentUser) {
+        toast.error("You must be logged in to create a post.");
+        return;
+      }
+      
       await createPost({
         content: content.trim(),
         mediaUrl: mediaUrl || undefined,
         mediaType: mediaType || undefined,
-      }, currentUser?.id);
+      }, currentUser); // Pass the entire user object instead of just the ID
       
       toast.success("Post created successfully!");
       
