@@ -1,3 +1,4 @@
+import { User } from '@/services/auth';
 
 export interface Post {
   id: string;

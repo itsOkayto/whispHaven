@@ -5,14 +5,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
 import { Menu, X, LogOut, User, Home, PenLine } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { NavbarProps } from './NavbarTypes';
 
-interface NavbarProps {
-  isLoggedIn: boolean;
-  onLogout: () => void;
-  onLogin: () => void;
-}
-
-const Navbar = ({ isLoggedIn, onLogout, onLogin }: NavbarProps) => {
+const Navbar = ({ isLoggedIn, onLogout, onLogin, rightContent }: NavbarProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -77,6 +72,12 @@ const Navbar = ({ isLoggedIn, onLogout, onLogin }: NavbarProps) => {
                 Login
               </Button>
             )}
+            
+            {rightContent && (
+              <div className="ml-2">
+                {rightContent}
+              </div>
+            )}
           </div>
 
           {/* Mobile Navigation Toggle */}
@@ -125,6 +126,12 @@ const Navbar = ({ isLoggedIn, onLogout, onLogin }: NavbarProps) => {
                   <User className="w-4 h-4 mr-2" />
                   Login
                 </button>
+              )}
+              
+              {rightContent && (
+                <div className="px-4 py-2.5">
+                  {rightContent}
+                </div>
               )}
             </div>
           </div>
