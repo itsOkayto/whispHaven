@@ -1,4 +1,3 @@
-
 export interface Post {
   id: string;
   content: string;
@@ -7,9 +6,17 @@ export interface Post {
   createdAt: Date;
   likes: number;
   comments: number;
+  userId?: string;
+  reactions?: {
+    happy: number;
+    sad: number;
+    angry: number;
+    surprised: number;
+  };
 }
 
-// Mock data for demo purposes
+export type ReactionType = 'happy' | 'sad' | 'angry' | 'surprised';
+
 const MOCK_POSTS: Post[] = [
   {
     id: "post1",
@@ -17,6 +24,12 @@ const MOCK_POSTS: Post[] = [
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
     likes: 42,
     comments: 15,
+    reactions: {
+      happy: 20,
+      sad: 5,
+      angry: 7,
+      surprised: 10
+    }
   },
   {
     id: "post2",
@@ -52,16 +65,14 @@ const MOCK_POSTS: Post[] = [
   },
 ];
 
-// Local storage keys
 const POSTS_STORAGE_KEY = "whispHaven_posts";
 const LIKED_POSTS_KEY = "whispHaven_liked_posts";
+const USER_REACTIONS_KEY = "whispHaven_user_reactions";
 
-// Helper to get posts from storage or initialize with mock data
 const getStoredPosts = (): Post[] => {
   const stored = localStorage.getItem(POSTS_STORAGE_KEY);
   if (stored) {
     try {
-      // Parse the stored JSON and convert string dates back to Date objects
       const parsed = JSON.parse(stored);
       return parsed.map((post: any) => ({
         ...post,
@@ -75,10 +86,8 @@ const getStoredPosts = (): Post[] => {
   return [...MOCK_POSTS];
 };
 
-// Get all posts
 export const getPosts = (): Promise<Post[]> => {
   return new Promise((resolve) => {
-    // Simulate API delay
     setTimeout(() => {
       const posts = getStoredPosts();
       resolve(posts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
@@ -86,10 +95,8 @@ export const getPosts = (): Promise<Post[]> => {
   });
 };
 
-// Create a new post
-export const createPost = (postData: Omit<Post, 'id' | 'createdAt' | 'likes' | 'comments'>): Promise<Post> => {
+export const createPost = (postData: Omit<Post, 'id' | 'createdAt' | 'likes' | 'comments' | 'reactions'>, userId?: string): Promise<Post> => {
   return new Promise((resolve) => {
-    // Simulate API delay
     setTimeout(() => {
       const posts = getStoredPosts();
       
@@ -99,6 +106,13 @@ export const createPost = (postData: Omit<Post, 'id' | 'createdAt' | 'likes' | '
         createdAt: new Date(),
         likes: 0,
         comments: 0,
+        userId,
+        reactions: {
+          happy: 0,
+          sad: 0,
+          angry: 0,
+          surprised: 0
+        }
       };
       
       posts.unshift(newPost);
@@ -109,10 +123,40 @@ export const createPost = (postData: Omit<Post, 'id' | 'createdAt' | 'likes' | '
   });
 };
 
-// Like/unlike a post
+export const deletePost = (postId: string, userId?: string): Promise<boolean> => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const posts = getStoredPosts();
+      const postIndex = posts.findIndex(p => p.id === postId);
+      
+      if (postIndex === -1) {
+        reject(new Error("Post not found"));
+        return;
+      }
+      
+      const post = posts[postIndex];
+      
+      if (userId && post.userId && post.userId !== userId) {
+        reject(new Error("Unauthorized: You can only delete your own posts"));
+        return;
+      }
+      
+      posts.splice(postIndex, 1);
+      localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(posts));
+      
+      const userReactions = JSON.parse(localStorage.getItem(USER_REACTIONS_KEY) || "{}");
+      if (userReactions[postId]) {
+        delete userReactions[postId];
+        localStorage.setItem(USER_REACTIONS_KEY, JSON.stringify(userReactions));
+      }
+      
+      resolve(true);
+    }, 500);
+  });
+};
+
 export const toggleLikePost = (postId: string): Promise<{ post: Post, liked: boolean }> => {
   return new Promise((resolve) => {
-    // Simulate API delay
     setTimeout(() => {
       const posts = getStoredPosts();
       const likedPosts = JSON.parse(localStorage.getItem(LIKED_POSTS_KEY) || "[]");
@@ -124,12 +168,10 @@ export const toggleLikePost = (postId: string): Promise<{ post: Post, liked: boo
       
       const isLiked = likedPosts.includes(postId);
       if (isLiked) {
-        // Unlike
         posts[postIndex].likes = Math.max(0, posts[postIndex].likes - 1);
         const newLikedPosts = likedPosts.filter((id: string) => id !== postId);
         localStorage.setItem(LIKED_POSTS_KEY, JSON.stringify(newLikedPosts));
       } else {
-        // Like
         posts[postIndex].likes += 1;
         likedPosts.push(postId);
         localStorage.setItem(LIKED_POSTS_KEY, JSON.stringify(likedPosts));
@@ -142,8 +184,59 @@ export const toggleLikePost = (postId: string): Promise<{ post: Post, liked: boo
   });
 };
 
-// Check if user has liked a post
+export const addReaction = (postId: string, reactionType: ReactionType, userId: string): Promise<Post> => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const posts = getStoredPosts();
+      const postIndex = posts.findIndex(p => p.id === postId);
+      
+      if (postIndex === -1) {
+        reject(new Error("Post not found"));
+        return;
+      }
+      
+      const userReactions = JSON.parse(localStorage.getItem(USER_REACTIONS_KEY) || "{}");
+      const previousReaction = userReactions[postId];
+      
+      if (previousReaction) {
+        posts[postIndex].reactions![previousReaction] = Math.max(0, posts[postIndex].reactions![previousReaction] - 1);
+      }
+      
+      if (!previousReaction || previousReaction !== reactionType) {
+        if (!posts[postIndex].reactions) {
+          posts[postIndex].reactions = {
+            happy: 0,
+            sad: 0,
+            angry: 0,
+            surprised: 0
+          };
+        }
+        
+        posts[postIndex].reactions![reactionType]++;
+        userReactions[postId] = reactionType;
+      } else {
+        delete userReactions[postId];
+      }
+      
+      localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(posts));
+      localStorage.setItem(USER_REACTIONS_KEY, JSON.stringify(userReactions));
+      
+      resolve(posts[postIndex]);
+    }, 500);
+  });
+};
+
+export const getUserReaction = (postId: string): ReactionType | null => {
+  const userReactions = JSON.parse(localStorage.getItem(USER_REACTIONS_KEY) || "{}");
+  return userReactions[postId] || null;
+};
+
 export const hasLikedPost = (postId: string): boolean => {
   const likedPosts = JSON.parse(localStorage.getItem(LIKED_POSTS_KEY) || "[]");
   return likedPosts.includes(postId);
+};
+
+export const isUserPost = (post: Post, userId?: string): boolean => {
+  if (!userId || !post.userId) return false;
+  return post.userId === userId;
 };

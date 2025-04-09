@@ -93,7 +93,12 @@ const Feed = () => {
         ) : posts.length > 0 ? (
           <div className="space-y-6">
             {posts.map(post => (
-              <PostCard key={post.id} post={post} refreshPosts={fetchPosts} />
+              <PostCard 
+                key={post.id} 
+                post={post} 
+                refreshPosts={fetchPosts} 
+                currentUser={user}
+              />
             ))}
           </div>
         ) : (

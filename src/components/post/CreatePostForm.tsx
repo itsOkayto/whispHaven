@@ -1,10 +1,12 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, ChangeEvent } from 'react';
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ImagePlus, X, Loader2, Send } from 'lucide-react';
+import { ImagePlus, X, Send, Loader2 } from 'lucide-react';
 import { createPost } from '@/services/posts';
 import { toast } from 'sonner';
+import { getCurrentUser } from '@/services/auth';
 
 interface CreatePostFormProps {
   onPostCreated: () => void;
@@ -18,28 +20,37 @@ const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) { // 10MB limit
-      toast.error("File too large. Please upload files smaller than 10MB.");
+    // Check file size (limit to 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File is too large. Maximum size is 5MB.");
       return;
     }
 
-    // Create preview
-    const reader = new FileReader();
-    reader.onload = () => {
-      setMediaPreview(reader.result as string);
+    // Generate preview
+    const fileReader = new FileReader();
+    fileReader.onload = () => {
+      setMediaPreview(fileReader.result as string);
     };
-    reader.readAsDataURL(file);
-
-    // Set file and type
+    fileReader.readAsDataURL(file);
+    
+    // Set media type
+    if (file.type.startsWith('image/')) {
+      setMediaType('image');
+    } else if (file.type.startsWith('video/')) {
+      setMediaType('video');
+    } else {
+      toast.error("Unsupported file type. Please upload an image or video.");
+      return;
+    }
+    
     setMediaFile(file);
-    setMediaType(file.type.startsWith('image/') ? 'image' : 'video');
   };
 
-  const clearMedia = () => {
+  const handleRemoveMedia = () => {
     setMediaFile(null);
     setMediaPreview(null);
     setMediaType(null);
@@ -48,38 +59,36 @@ const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSubmit = async () => {
     if (!content.trim() && !mediaFile) {
-      toast.error("Please add some content or media to your post");
+      toast.error("Please add some content to your post.");
       return;
     }
-    
+
     try {
       setIsSubmitting(true);
       
-      let mediaUrl = undefined;
+      // In a real app, upload the media file to storage and get a URL
+      // For demo purposes, we'll just use the preview as the URL
+      const mediaUrl = mediaPreview;
       
-      if (mediaFile) {
-        // In a real app, we would upload to storage and get URL
-        // For this mock app, we'll use the preview as the URL
-        mediaUrl = mediaPreview || undefined;
-      }
+      // Get current user
+      const currentUser = await getCurrentUser();
       
       await createPost({
-        content,
-        mediaUrl,
-        mediaType,
-      });
+        content: content.trim(),
+        mediaUrl: mediaUrl || undefined,
+        mediaType: mediaType || undefined,
+      }, currentUser?.id);
+      
+      toast.success("Post created successfully!");
       
       // Reset form
       setContent('');
-      clearMedia();
+      handleRemoveMedia();
       
-      toast.success("Post created successfully!");
+      // Refresh posts in parent component
       onPostCreated();
-      
     } catch (error) {
       console.error("Error creating post:", error);
       toast.error("Failed to create post. Please try again.");
@@ -89,86 +98,90 @@ const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="pookie-card p-4 mb-6">
-      <div className="mb-4">
-        <Textarea
-          placeholder="Share your weirdest thoughts or moments anonymously..."
-          className="min-h-[100px] resize-y focus:outline-none focus:ring-2 focus:ring-accent/50 rounded-lg placeholder:text-muted-foreground/70"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          disabled={isSubmitting}
-        />
-      </div>
-      
-      {mediaPreview && (
-        <div className="relative mb-4 rounded-lg overflow-hidden">
-          {mediaType === 'image' ? (
-            <img 
-              src={mediaPreview} 
-              alt="Upload preview" 
-              className="max-h-[300px] w-auto mx-auto"
-            />
-          ) : (
-            <video 
-              src={mediaPreview} 
-              controls 
-              className="max-h-[300px] w-auto mx-auto"
-            />
-          )}
-          
-          <button
-            type="button"
-            className="absolute top-2 right-2 bg-black/70 text-white p-1 rounded-full hover:bg-black/90"
-            onClick={clearMedia}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-      
-      <div className="flex justify-between items-center">
-        <div>
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            accept="image/*,video/*"
-            onChange={handleFileChange}
-            disabled={isSubmitting}
+    <Card className="pookie-card mb-8">
+      <CardContent className="p-4">
+        <div className="space-y-4">
+          <Textarea
+            placeholder="Share your anonymous thoughts..."
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            className="min-h-[80px] resize-none border-pookie-purple/30 focus-visible:ring-pookie-purple/50"
           />
           
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-primary hover:bg-secondary/50"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isSubmitting}
-          >
-            <ImagePlus className="h-4 w-4 mr-1" />
-            Add Media
-          </Button>
-        </div>
-        
-        <Button 
-          type="submit" 
-          className="pookie-button"
-          disabled={isSubmitting || (!content.trim() && !mediaFile)}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              Posting...
-            </>
-          ) : (
-            <>
-              <Send className="h-4 w-4 mr-1" />
-              Post
-            </>
+          {mediaPreview && (
+            <div className="relative">
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                className="absolute top-2 right-2 h-6 w-6 rounded-full"
+                onClick={handleRemoveMedia}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+              
+              {mediaType === 'image' && (
+                <img
+                  src={mediaPreview}
+                  alt="Media preview"
+                  className="max-h-[300px] w-full object-contain rounded-md"
+                />
+              )}
+              
+              {mediaType === 'video' && (
+                <video
+                  src={mediaPreview}
+                  controls
+                  className="max-h-[300px] w-full rounded-md"
+                />
+              )}
+            </div>
           )}
-        </Button>
-      </div>
-    </form>
+          
+          <div className="flex justify-between items-center">
+            <div>
+              <input
+                type="file"
+                id="media-upload"
+                className="hidden"
+                accept="image/*,video/*"
+                onChange={handleFileChange}
+                ref={fileInputRef}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-muted-foreground border-pookie-purple/30 hover:bg-pookie-purple/10"
+              >
+                <ImagePlus className="h-4 w-4 mr-2" />
+                Add Media
+              </Button>
+            </div>
+            
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting || (!content.trim() && !mediaFile)}
+              className="bg-gradient-to-r from-pookie-purple to-pookie-blue hover:opacity-90"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Posting...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Post
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

@@ -2,20 +2,53 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, Share2 } from 'lucide-react';
-import { Post, toggleLikePost, hasLikedPost } from '@/services/posts';
+import { Heart, MessageCircle, Share2, Trash2, SmilePlus, Smile, Frown, Angry, Sparkles } from 'lucide-react';
+import { 
+  Post, 
+  toggleLikePost, 
+  hasLikedPost, 
+  isUserPost, 
+  deletePost,
+  addReaction,
+  getUserReaction,
+  ReactionType
+} from '@/services/posts';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { User } from '@/services/auth';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface PostCardProps {
   post: Post;
   refreshPosts: () => void;
+  currentUser: User | null;
 }
 
-const PostCard = ({ post, refreshPosts }: PostCardProps) => {
+const PostCard = ({ post, refreshPosts, currentUser }: PostCardProps) => {
   const [isLiked, setIsLiked] = useState<boolean>(hasLikedPost(post.id));
   const [likeCount, setLikeCount] = useState<number>(post.likes);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [currentReaction, setCurrentReaction] = useState<ReactionType | null>(
+    getUserReaction(post.id)
+  );
+
+  const isOwnPost = isUserPost(post, currentUser?.id);
 
   const handleLike = async () => {
     try {
@@ -37,19 +70,107 @@ const PostCard = ({ post, refreshPosts }: PostCardProps) => {
     toast.success("Link copied to clipboard!");
   };
 
+  const handleDelete = async () => {
+    if (!currentUser) {
+      toast.error("You must be logged in to delete posts");
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      await deletePost(post.id, currentUser.id);
+      toast.success("Post deleted successfully");
+      refreshPosts();
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      toast.error("Could not delete post. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleReaction = async (reactionType: ReactionType) => {
+    if (!currentUser) {
+      toast.error("You must be logged in to react to posts");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const updatedPost = await addReaction(post.id, reactionType, currentUser.id);
+      
+      // Check if the reaction was toggled on or off
+      const newReaction = getUserReaction(post.id);
+      setCurrentReaction(newReaction);
+      
+      // Update the post with latest reactions
+      post.reactions = updatedPost.reactions;
+      
+    } catch (error) {
+      console.error("Error adding reaction:", error);
+      toast.error("Could not add reaction. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getReactionIcon = (reaction: ReactionType) => {
+    switch (reaction) {
+      case 'happy': return <Smile className="h-4 w-4" />;
+      case 'sad': return <Frown className="h-4 w-4" />;
+      case 'angry': return <Angry className="h-4 w-4" />;
+      case 'surprised': return <Sparkles className="h-4 w-4" />;
+      default: return null;
+    }
+  };
+
   return (
     <Card className="pookie-card overflow-hidden hover:shadow-md transition-all">
       <CardContent className="p-4 md:p-6">
-        <div className="flex items-start gap-3 mb-3">
-          <div className="h-8 w-8 flex items-center justify-center bg-gradient-to-br from-pookie-purple to-pookie-blue rounded-full text-white font-bold text-sm">
-            A
-          </div>
-          <div className="flex flex-col">
-            <div className="font-medium">Anonymous</div>
-            <div className="text-xs text-muted-foreground">
-              {formatDistanceToNow(post.createdAt, { addSuffix: true })}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex items-start gap-3">
+            <div className="h-8 w-8 flex items-center justify-center bg-gradient-to-br from-pookie-purple to-pookie-blue rounded-full text-white font-bold text-sm">
+              A
+            </div>
+            <div className="flex flex-col">
+              <div className="font-medium">Anonymous</div>
+              <div className="text-xs text-muted-foreground">
+                {formatDistanceToNow(post.createdAt, { addSuffix: true })}
+              </div>
             </div>
           </div>
+          
+          {isOwnPost && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="rounded-full h-8 w-8 text-muted-foreground hover:text-destructive"
+                  disabled={isDeleting}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="bg-pookie-pink/10 border-pookie-pink">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. The post will be permanently deleted.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={handleDelete}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
 
         <div className="mt-2 text-base whitespace-pre-line">{post.content}</div>
@@ -98,6 +219,66 @@ const PostCard = ({ post, refreshPosts }: PostCardProps) => {
             <MessageCircle className="h-4 w-4 mr-1" />
             {post.comments}
           </Button>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={`rounded-full flex items-center ${currentReaction ? 'text-primary' : ''}`}
+                disabled={isLoading}
+              >
+                {currentReaction ? getReactionIcon(currentReaction) : <SmilePlus className="h-4 w-4 mr-1" />}
+                {currentReaction ? 'Reacted' : 'React'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-2" align="center">
+              <div className="flex space-x-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={`rounded-full ${currentReaction === 'happy' ? 'bg-pookie-yellow' : ''}`}
+                  onClick={() => handleReaction('happy')}
+                >
+                  <Smile className="h-5 w-5 text-amber-500" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={`rounded-full ${currentReaction === 'sad' ? 'bg-pookie-blue' : ''}`}
+                  onClick={() => handleReaction('sad')}
+                >
+                  <Frown className="h-5 w-5 text-blue-500" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={`rounded-full ${currentReaction === 'angry' ? 'bg-pookie-peach' : ''}`}
+                  onClick={() => handleReaction('angry')}
+                >
+                  <Angry className="h-5 w-5 text-red-500" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={`rounded-full ${currentReaction === 'surprised' ? 'bg-pookie-green' : ''}`}
+                  onClick={() => handleReaction('surprised')}
+                >
+                  <Sparkles className="h-5 w-5 text-purple-500" />
+                </Button>
+              </div>
+              <div className="flex justify-center mt-2 text-xs text-muted-foreground">
+                {post.reactions && (
+                  <div className="flex space-x-2">
+                    <span>{post.reactions.happy} 😊</span>
+                    <span>{post.reactions.sad} 😢</span>
+                    <span>{post.reactions.angry} 😠</span>
+                    <span>{post.reactions.surprised} ✨</span>
+                  </div>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
 
           <Button 
             variant="ghost" 
