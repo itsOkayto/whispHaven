@@ -9,6 +9,7 @@ import { getPosts, Post } from '@/services/posts';
 import { User, getCurrentUser, loginWithGoogle, logout } from '@/services/auth';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 const Feed = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -73,43 +74,45 @@ const Feed = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar 
-        isLoggedIn={!!user} 
-        onLogin={handleLogin} 
-        onLogout={handleLogout}
-      />
-      
-      <main className="flex-grow container max-w-3xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-6">Anonymous Feed</h1>
+    <TooltipProvider>
+      <div className="min-h-screen flex flex-col">
+        <Navbar 
+          isLoggedIn={!!user} 
+          onLogin={handleLogin} 
+          onLogout={handleLogout}
+        />
         
-        {user && <CreatePostForm onPostCreated={fetchPosts} />}
+        <main className="flex-grow container max-w-3xl mx-auto px-4 py-8">
+          <h1 className="text-2xl font-bold mb-6">Anonymous Feed</h1>
+          
+          {user && <CreatePostForm onPostCreated={fetchPosts} />}
+          
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2 text-lg">Loading posts...</span>
+            </div>
+          ) : posts.length > 0 ? (
+            <div className="space-y-6">
+              {posts.map(post => (
+                <PostCard 
+                  key={post.id} 
+                  post={post} 
+                  refreshPosts={fetchPosts} 
+                  currentUser={user}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-lg text-muted-foreground">No posts yet. Be the first to share!</p>
+            </div>
+          )}
+        </main>
         
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2 text-lg">Loading posts...</span>
-          </div>
-        ) : posts.length > 0 ? (
-          <div className="space-y-6">
-            {posts.map(post => (
-              <PostCard 
-                key={post.id} 
-                post={post} 
-                refreshPosts={fetchPosts} 
-                currentUser={user}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-lg text-muted-foreground">No posts yet. Be the first to share!</p>
-          </div>
-        )}
-      </main>
-      
-      <Footer />
-    </div>
+        <Footer />
+      </div>
+    </TooltipProvider>
   );
 };
 
