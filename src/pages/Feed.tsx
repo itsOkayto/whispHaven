@@ -5,22 +5,26 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import PostCard from '@/components/post/PostCard';
 import CreatePostForm from '@/components/post/CreatePostForm';
-import { getPosts, Post } from '@/services/posts';
+import { getPosts, Post, PostType, ReactionType } from '@/services/posts';
 import { User, getCurrentUser, loginWithGoogle, logout } from '@/services/auth';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import PostFilters from '@/components/post/PostFilters';
+import UserSettings from '@/components/account/UserSettings';
 
 const Feed = () => {
   const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [typeFilter, setTypeFilter] = useState<PostType | undefined>(undefined);
+  const [reactionFilter, setReactionFilter] = useState<ReactionType | undefined>(undefined);
   const navigate = useNavigate();
 
   const fetchPosts = useCallback(async () => {
     try {
       setIsLoading(true);
-      const fetchedPosts = await getPosts();
+      const fetchedPosts = await getPosts(typeFilter, reactionFilter);
       setPosts(fetchedPosts);
     } catch (error) {
       console.error("Error fetching posts:", error);
@@ -28,7 +32,7 @@ const Feed = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [typeFilter, reactionFilter]);
 
   useEffect(() => {
     const init = async () => {
@@ -73,6 +77,51 @@ const Feed = () => {
     }
   };
 
+  const handleFilterChange = (type: PostType | undefined, reaction: ReactionType | undefined) => {
+    setTypeFilter(type);
+    setReactionFilter(reaction);
+  };
+
+  const handleUserUpdate = () => {
+    fetchPosts();
+  };
+
+  const renderPostSection = () => {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2 text-lg">Loading posts...</span>
+        </div>
+      );
+    }
+
+    if (posts.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <p className="text-lg text-muted-foreground">
+            {typeFilter || reactionFilter 
+              ? "No posts match your filters. Try different criteria!" 
+              : "No posts yet. Be the first to share!"}
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {posts.map(post => (
+          <PostCard 
+            key={post.id} 
+            post={post} 
+            refreshPosts={fetchPosts} 
+            currentUser={user}
+          />
+        ))}
+      </div>
+    );
+  };
+
   return (
     <TooltipProvider>
       <div className="min-h-screen flex flex-col">
@@ -80,6 +129,7 @@ const Feed = () => {
           isLoggedIn={!!user} 
           onLogin={handleLogin} 
           onLogout={handleLogout}
+          rightContent={user && <UserSettings user={user} onLogout={handleLogout} onUpdate={handleUserUpdate} />}
         />
         
         <main className="flex-grow container max-w-3xl mx-auto px-4 py-8">
@@ -87,27 +137,9 @@ const Feed = () => {
           
           {user && <CreatePostForm onPostCreated={fetchPosts} />}
           
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <span className="ml-2 text-lg">Loading posts...</span>
-            </div>
-          ) : posts.length > 0 ? (
-            <div className="space-y-6">
-              {posts.map(post => (
-                <PostCard 
-                  key={post.id} 
-                  post={post} 
-                  refreshPosts={fetchPosts} 
-                  currentUser={user}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <p className="text-lg text-muted-foreground">No posts yet. Be the first to share!</p>
-            </div>
-          )}
+          <PostFilters onFilterChange={handleFilterChange} />
+          
+          {renderPostSection()}
         </main>
         
         <Footer />

@@ -2,7 +2,19 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, Share2, Trash2, SmilePlus, Smile, Frown, Angry, Sparkles } from 'lucide-react';
+import { 
+  Heart, 
+  MessageCircle, 
+  Share2, 
+  Trash2, 
+  SmilePlus, 
+  Smile, 
+  Frown, 
+  Angry, 
+  Sparkles,
+  Flag,
+  AlertTriangle
+} from 'lucide-react';
 import { 
   Post, 
   toggleLikePost, 
@@ -11,7 +23,8 @@ import {
   deletePost,
   addReaction,
   getUserReaction,
-  ReactionType
+  ReactionType,
+  flagPost
 } from '@/services/posts';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -32,6 +45,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import PostAvatar from './PostAvatar';
+import CommentSection from './CommentSection';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface PostCardProps {
   post: Post;
@@ -44,11 +61,13 @@ const PostCard = ({ post, refreshPosts, currentUser }: PostCardProps) => {
   const [likeCount, setLikeCount] = useState<number>(post.likes);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [isFlagged, setIsFlagged] = useState<boolean>(post.isFlagged || false);
   const [currentReaction, setCurrentReaction] = useState<ReactionType | null>(
     getUserReaction(post.id)
   );
 
   const isOwnPost = isUserPost(post, currentUser?.id);
+  const isIncognito = currentUser?.isIncognito;
 
   const handleLike = async () => {
     try {
@@ -89,6 +108,20 @@ const PostCard = ({ post, refreshPosts, currentUser }: PostCardProps) => {
     }
   };
 
+  const handleFlag = async () => {
+    try {
+      setIsLoading(true);
+      await flagPost(post.id);
+      setIsFlagged(true);
+      toast.success("Post has been flagged for review");
+    } catch (error) {
+      console.error("Error flagging post:", error);
+      toast.error("Could not flag post. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleReaction = async (reactionType: ReactionType) => {
     if (!currentUser) {
       toast.error("You must be logged in to react to posts");
@@ -124,14 +157,21 @@ const PostCard = ({ post, refreshPosts, currentUser }: PostCardProps) => {
     }
   };
 
+  // Hide own posts in incognito mode
+  if (isOwnPost && isIncognito) {
+    return null;
+  }
+
   return (
-    <Card className="pookie-card overflow-hidden hover:shadow-md transition-all">
+    <Card className={`pookie-card overflow-hidden hover:shadow-md transition-all ${post.isPookieOfDay ? 'border-amber-300 bg-amber-50/30 dark:bg-amber-950/10' : ''}`}>
       <CardContent className="p-4 md:p-6">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-start gap-3">
-            <div className="h-8 w-8 flex items-center justify-center bg-gradient-to-br from-pookie-purple to-pookie-blue rounded-full text-white font-bold text-sm">
-              A
-            </div>
+            <PostAvatar 
+              avatar={post.userAvatar}
+              emoji={post.userEmoji}
+              isPookieOfDay={post.isPookieOfDay}
+            />
             <div className="flex flex-col">
               <div className="font-medium">Anonymous</div>
               <div className="text-xs text-muted-foreground">
@@ -140,37 +180,85 @@ const PostCard = ({ post, refreshPosts, currentUser }: PostCardProps) => {
             </div>
           </div>
           
-          {isOwnPost && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="rounded-full h-8 w-8 text-muted-foreground hover:text-destructive"
-                  disabled={isDeleting}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="bg-pookie-pink/10 border-pookie-pink">
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete this post?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. The post will be permanently deleted.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={handleDelete}
-                    className="bg-destructive hover:bg-destructive/90"
+          <div className="flex items-center">
+            {post.isPookieOfDay && (
+              <Badge variant="outline" className="mr-2 bg-amber-100 text-amber-800 border-amber-200">
+                🧃 Pookie of the Day
+              </Badge>
+            )}
+            
+            {isFlagged && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertTriangle className="h-4 w-4 text-amber-500 mr-2" />
+                </TooltipTrigger>
+                <TooltipContent>This post has been flagged</TooltipContent>
+              </Tooltip>
+            )}
+            
+            {!isOwnPost && !isFlagged && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="rounded-full h-8 w-8 text-muted-foreground"
                   >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+                    <Flag className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="bg-background">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Report this post?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will flag the post for moderation. It may be removed if it violates community guidelines.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={handleFlag}
+                      className="bg-amber-500 hover:bg-amber-600"
+                    >
+                      Report
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            
+            {isOwnPost && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="rounded-full h-8 w-8 text-muted-foreground hover:text-destructive"
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="bg-pookie-pink/10 border-pookie-pink">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. The post will be permanently deleted.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={handleDelete}
+                      className="bg-destructive hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
 
         <div className="mt-2 text-base whitespace-pre-line">{post.content}</div>
@@ -196,6 +284,8 @@ const PostCard = ({ post, refreshPosts, currentUser }: PostCardProps) => {
             />
           </div>
         )}
+
+        <CommentSection postId={post.id} currentUser={currentUser} />
       </CardContent>
 
       <CardFooter className="p-3 pt-0 border-t border-border/30">
