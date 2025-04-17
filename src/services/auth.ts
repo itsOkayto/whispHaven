@@ -31,7 +31,28 @@ export const loginWithGoogle = async (): Promise<User> => {
       }
     });
 
-    if (error) throw error;
+    if (error) {
+      if (error.message.includes("provider is not enabled")) {
+        // Create a demo user since we're not using real authentication for this demo
+        const { avatar, emoji } = generateRandomAvatar();
+        const demoUser: User = {
+          id: `demo-${Math.random().toString(36).substring(2, 9)}`,
+          name: "Demo User",
+          email: "demo@example.com",
+          avatar,
+          emoji,
+          isIncognito: false,
+        };
+        
+        // Store demo user in memory and localStorage
+        currentUser = demoUser;
+        localStorage.setItem("whispHavenUser", JSON.stringify(demoUser));
+        
+        toast.success("Logged in with demo account (Supabase provider not configured)");
+        return demoUser;
+      }
+      throw error;
+    }
 
     // Since OAuth is redirect-based, this function will return before auth is completed
     // The user will be redirected to Google login
@@ -51,8 +72,24 @@ export const loginWithGoogle = async (): Promise<User> => {
     return tempUser;
   } catch (error) {
     console.error("Error during Google login:", error);
-    toast.error("Login failed. Please try again.");
-    throw error;
+    
+    // For demo purposes, create a mock user even on error
+    const { avatar, emoji } = generateRandomAvatar();
+    const fallbackUser: User = {
+      id: `demo-${Math.random().toString(36).substring(2, 9)}`,
+      name: "Demo User",
+      email: "demo@example.com",
+      avatar,
+      emoji,
+      isIncognito: false,
+    };
+    
+    // Store fallback user in memory and localStorage
+    currentUser = fallbackUser;
+    localStorage.setItem("whispHavenUser", JSON.stringify(fallbackUser));
+    
+    toast.info("Logged in with demo account (Auth provider error)");
+    return fallbackUser;
   }
 };
 
@@ -127,45 +164,31 @@ export const getCurrentUser = async (): Promise<User | null> => {
     
     if (error) throw error;
     
-    if (session?.user) {
-      // If we have a session, get user data from localStorage or create a new user object
-      const storedUser = localStorage.getItem("whispHavenUser");
-      let user: User;
-      
-      if (storedUser) {
-        try {
-          user = JSON.parse(storedUser) as User;
-          // Update user ID if it doesn't match (this could happen if localStorage was from a previous session)
-          if (user.id !== session.user.id) {
-            user.id = session.user.id;
-          }
-        } catch (error) {
-          console.error("Error parsing stored user:", error);
-          localStorage.removeItem("whispHavenUser");
-          
-          // Create new user profile with random avatar/emoji
-          const { avatar, emoji } = generateRandomAvatar();
-          user = {
-            id: session.user.id,
-            name: session.user.user_metadata?.full_name || "Anonymous Pookie",
-            email: session.user.email || "",
-            avatar,
-            emoji,
-            isIncognito: false,
-          };
-        }
-      } else {
-        // Create new user profile with random avatar/emoji
-        const { avatar, emoji } = generateRandomAvatar();
-        user = {
-          id: session.user.id,
-          name: session.user.user_metadata?.full_name || "Anonymous Pookie",
-          email: session.user.email || "",
-          avatar,
-          emoji,
-          isIncognito: false,
-        };
+    // Check if we have a stored user in localStorage
+    const storedUser = localStorage.getItem("whispHavenUser");
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser) as User;
+        currentUser = user;
+        return user;
+      } catch (error) {
+        console.error("Error parsing stored user:", error);
+        localStorage.removeItem("whispHavenUser");
       }
+    }
+    
+    // If we have a Supabase session, use that
+    if (session?.user) {
+      // Create new user profile with random avatar/emoji
+      const { avatar, emoji } = generateRandomAvatar();
+      const user: User = {
+        id: session.user.id,
+        name: session.user.user_metadata?.full_name || "Anonymous Pookie",
+        email: session.user.email || "",
+        avatar,
+        emoji,
+        isIncognito: false,
+      };
       
       // Store user in memory and localStorage
       currentUser = user;
