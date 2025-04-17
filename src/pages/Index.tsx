@@ -1,9 +1,9 @@
-
 import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import Hero from '@/components/home/Hero';
-import { User, getCurrentUser, loginWithGoogle, logout } from '@/services/auth';
+import { User } from '@/types/supabase';
+import { getCurrentUser, loginWithGoogle, logout } from '@/services/auth';
 
 const Index = () => {
   const [user, setUser] = useState<User | null>(null);

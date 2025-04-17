@@ -5,7 +5,8 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { User, getCurrentUser, loginWithGoogle, logout } from '@/services/auth';
+import { User } from '@/types/supabase';
+import { getCurrentUser, loginWithGoogle, logout } from '@/services/auth';
 import { toast } from 'sonner';
 import { LogOut, Shield, User as UserIcon } from 'lucide-react';
 

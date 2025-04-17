@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,20 +14,19 @@ import {
   Flag,
   AlertTriangle
 } from 'lucide-react';
-import { 
-  Post, 
+import { toast } from 'sonner';
+import { User } from '@/types/supabase';
+import {
   toggleLikePost, 
   hasLikedPost, 
   isUserPost, 
   deletePost,
   addReaction,
   getUserReaction,
-  ReactionType,
   flagPost
 } from '@/services/posts';
+import { Post, ReactionType } from '@/types/supabase';
 import { formatDistanceToNow } from 'date-fns';
-import { toast } from 'sonner';
-import { User } from '@/services/auth';
 import {
   AlertDialog,
   AlertDialogAction,

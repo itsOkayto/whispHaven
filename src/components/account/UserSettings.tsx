@@ -1,16 +1,16 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, User, Moon, Eye, EyeOff, LogOut, Trash2 } from "lucide-react";
+import { Loader2, User as UserIcon, Moon, Eye, EyeOff, LogOut, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { User as UserType, toggleIncognitoMode, deleteAccount } from '@/services/auth';
+import { User } from '@/types/supabase';
+import { toggleIncognitoMode, deleteAccount } from '@/services/auth';
 
 interface UserSettingsProps {
-  user: UserType;
+  user: User;
   onLogout: () => Promise<void>;
   onUpdate: () => void;
 }
@@ -58,7 +58,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ user, onLogout, onUpdate })
           <Avatar className="h-8 w-8 border border-border">
             <AvatarImage src={user.avatar} alt="User avatar" />
             <AvatarFallback className="bg-gradient-to-br from-pookie-purple to-pookie-blue text-white">
-              {user.emoji || <User className="h-4 w-4" />}
+              {user.emoji || <UserIcon className="h-4 w-4" />}
             </AvatarFallback>
           </Avatar>
         </Button>

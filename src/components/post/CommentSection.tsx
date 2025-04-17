@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { User } from '@/services/auth';
-import { Comment, getComments, addComment, deleteComment } from '@/services/posts';
+import { User } from '@/types/supabase';
+import { Comment } from '@/types/supabase';
+import { getComments, addComment, deleteComment } from '@/services/posts';
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
