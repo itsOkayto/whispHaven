@@ -7,6 +7,7 @@ import { User } from '@/types/supabase';
 import { getCurrentUser, loginWithGoogle, logout, setUseDemoAccount } from '@/services/auth';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { Database } from '@/icons/Database';
 
 const Index = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -105,6 +106,13 @@ const Index = () => {
             </div>
           </div>
         )}
+        
+        <div className="container max-w-2xl mx-auto px-4 py-2 text-center text-sm text-muted-foreground">
+          <p className="flex items-center justify-center">
+            <Database className="h-4 w-4 mr-1 text-emerald-500" />
+            Connected to Supabase
+          </p>
+        </div>
       </main>
       
       <Footer />
