@@ -24,6 +24,14 @@ let currentUser: User | null = null;
 
 export const loginWithGoogle = async (): Promise<User> => {
   try {
+    // Check if the user prefers to use a demo account directly
+    const useDemoAccount = localStorage.getItem("whispHaven_useDemoAccount") === "true";
+    
+    if (useDemoAccount) {
+      return createAndStoreDemoUser("Demo account used as preferred");
+    }
+
+    // Attempt to sign in with Google OAuth
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -32,23 +40,10 @@ export const loginWithGoogle = async (): Promise<User> => {
     });
 
     if (error) {
-      if (error.message.includes("provider is not enabled")) {
-        // Create a demo user since we're not using real authentication for this demo
-        const { avatar, emoji } = generateRandomAvatar();
-        const demoUser: User = {
-          id: `demo-${Math.random().toString(36).substring(2, 9)}`,
-          name: "Demo User",
-          email: "demo@example.com",
-          avatar,
-          emoji,
-          isIncognito: false,
-        };
-        
-        // Store demo user in memory and localStorage
-        currentUser = demoUser;
-        localStorage.setItem("whispHavenUser", JSON.stringify(demoUser));
-        
-        toast.success("Logged in with demo account (Supabase provider not configured)");
+      if (error.message.includes("provider is not enabled") || error.message.includes("Unsupported provider")) {
+        const demoUser = createAndStoreDemoUser("Supabase provider not configured");
+        // Mark that we're using demo mode due to provider configuration issues
+        localStorage.setItem("whispHaven_providerNotConfigured", "true");
         return demoUser;
       }
       throw error;
@@ -73,24 +68,29 @@ export const loginWithGoogle = async (): Promise<User> => {
   } catch (error) {
     console.error("Error during Google login:", error);
     
-    // For demo purposes, create a mock user even on error
-    const { avatar, emoji } = generateRandomAvatar();
-    const fallbackUser: User = {
-      id: `demo-${Math.random().toString(36).substring(2, 9)}`,
-      name: "Demo User",
-      email: "demo@example.com",
-      avatar,
-      emoji,
-      isIncognito: false,
-    };
-    
-    // Store fallback user in memory and localStorage
-    currentUser = fallbackUser;
-    localStorage.setItem("whispHavenUser", JSON.stringify(fallbackUser));
-    
-    toast.info("Logged in with demo account (Auth provider error)");
-    return fallbackUser;
+    // For any error, create a demo user as fallback
+    return createAndStoreDemoUser("Auth provider error");
   }
+};
+
+// Helper function to create and store a demo user
+const createAndStoreDemoUser = (reason: string): User => {
+  const { avatar, emoji } = generateRandomAvatar();
+  const demoUser: User = {
+    id: `demo-${Math.random().toString(36).substring(2, 9)}`,
+    name: "Demo User",
+    email: "demo@example.com",
+    avatar,
+    emoji,
+    isIncognito: false,
+  };
+  
+  // Store demo user in memory and localStorage
+  currentUser = demoUser;
+  localStorage.setItem("whispHavenUser", JSON.stringify(demoUser));
+  
+  toast.success(`Logged in with demo account (${reason})`);
+  return demoUser;
 };
 
 export const logout = async (): Promise<void> => {
@@ -197,9 +197,25 @@ export const getCurrentUser = async (): Promise<User | null> => {
       return user;
     }
     
+    // If we know the provider is not configured, create a demo user automatically
+    if (localStorage.getItem("whispHaven_providerNotConfigured") === "true") {
+      return createAndStoreDemoUser("Provider not configured (auto-login)");
+    }
+    
     return null;
   } catch (error) {
     console.error("Error getting current user:", error);
     return null;
+  }
+};
+
+// Helper function to allow users to explicitly prefer demo mode
+export const setUseDemoAccount = (useDemo: boolean): void => {
+  localStorage.setItem("whispHaven_useDemoAccount", useDemo ? "true" : "false");
+  
+  if (useDemo) {
+    toast.info("Demo mode enabled. You'll be logged in with a demo account on next login.");
+  } else {
+    toast.info("Demo mode disabled. Regular authentication will be used on next login.");
   }
 };
