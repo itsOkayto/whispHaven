@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { ReactionType, PostType } from '@/services/posts';
+import { ReactionType, PostType } from '@/types/supabase';
 import { Image, VideoIcon, FileText, FilterIcon, X, Smile, Frown, Angry, Sparkles } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
