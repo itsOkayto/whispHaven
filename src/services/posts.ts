@@ -1,4 +1,6 @@
-import { User } from '@/services/auth';
+import { User } from '@/types/supabase';
+import { Post, Comment, ReactionType, PostType } from '@/types/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface Post {
   id: string;

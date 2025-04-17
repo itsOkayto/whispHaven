@@ -1,15 +1,7 @@
 
 import { toast } from "sonner";
-
-// This would be replaced with actual Firebase/Google Auth implementation when connected to Supabase
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar: string;
-  emoji: string;
-  isIncognito: boolean;
-}
+import { supabase } from "@/integrations/supabase/client";
+import { User } from "@/types/supabase";
 
 // Cute emojis and avatars for random assignment
 const CUTE_EMOJIS = ["🐱", "🐶", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐵", "🐙", "🐢", "🦄", "🦋", "🐞"];
@@ -30,108 +22,161 @@ const generateRandomAvatar = () => {
 // Mock data for demo purposes
 let currentUser: User | null = null;
 
-export const loginWithGoogle = (): Promise<User> => {
-  return new Promise((resolve) => {
-    // Simulate API call
-    setTimeout(() => {
-      const { avatar, emoji } = generateRandomAvatar();
+export const loginWithGoogle = async (): Promise<User> => {
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
+    });
+
+    if (error) throw error;
+
+    // Since OAuth is redirect-based, this function will return before auth is completed
+    // The user will be redirected to Google login
+    // After successful login and redirect back, we'll check for the session and return the user
+
+    // Returning a temporary user, will be updated after redirect
+    const { avatar, emoji } = generateRandomAvatar();
+    const tempUser: User = {
+      id: "pending_auth",
+      name: "Signing in...",
+      email: "",
+      avatar,
+      emoji,
+      isIncognito: false,
+    };
+    
+    return tempUser;
+  } catch (error) {
+    console.error("Error during Google login:", error);
+    toast.error("Login failed. Please try again.");
+    throw error;
+  }
+};
+
+export const logout = async (): Promise<void> => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    
+    localStorage.removeItem("whispHavenUser");
+    currentUser = null;
+  } catch (error) {
+    console.error("Error during logout:", error);
+    toast.error("Logout failed. Please try again.");
+    throw error;
+  }
+};
+
+export const deleteAccount = async (): Promise<void> => {
+  try {
+    // In a real implementation, we would call a Supabase function to delete the user account
+    // For demo purposes, we'll just sign out and clear local storage
+    await logout();
+    
+    // Clear user data
+    localStorage.removeItem("whispHavenUser");
+    
+    // Clear user's posts
+    const posts = JSON.parse(localStorage.getItem("whispHaven_posts") || "[]");
+    const userId = currentUser?.id;
+    const filteredPosts = posts.filter((post: any) => post.userId !== userId);
+    localStorage.setItem("whispHaven_posts", JSON.stringify(filteredPosts));
+    
+    // Clear user reactions and likes
+    localStorage.removeItem("whispHaven_liked_posts");
+    localStorage.removeItem("whispHaven_user_reactions");
+    
+    // Clear user comments
+    localStorage.removeItem("whispHaven_comments");
+    
+    currentUser = null;
+  } catch (error) {
+    console.error("Error during account deletion:", error);
+    toast.error("Account deletion failed. Please try again.");
+    throw error;
+  }
+};
+
+export const toggleIncognitoMode = async (): Promise<User> => {
+  if (!currentUser) {
+    throw new Error("No user logged in");
+  }
+
+  try {
+    currentUser.isIncognito = !currentUser.isIncognito;
+    localStorage.setItem("whispHavenUser", JSON.stringify(currentUser));
+    return currentUser;
+  } catch (error) {
+    console.error("Error toggling incognito mode:", error);
+    throw error;
+  }
+};
+
+export const getCurrentUser = async (): Promise<User | null> => {
+  // First check if we have the user in memory
+  if (currentUser) {
+    return currentUser;
+  }
+  
+  try {
+    // Check Supabase session
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) throw error;
+    
+    if (session?.user) {
+      // If we have a session, get user data from localStorage or create a new user object
+      const storedUser = localStorage.getItem("whispHavenUser");
+      let user: User;
       
-      const user = {
-        id: "user_" + Math.random().toString(36).substring(2, 9),
-        name: "Anonymous Pookie",
-        email: "user@example.com",
-        avatar,
-        emoji,
-        isIncognito: false,
-      };
+      if (storedUser) {
+        try {
+          user = JSON.parse(storedUser) as User;
+          // Update user ID if it doesn't match (this could happen if localStorage was from a previous session)
+          if (user.id !== session.user.id) {
+            user.id = session.user.id;
+          }
+        } catch (error) {
+          console.error("Error parsing stored user:", error);
+          localStorage.removeItem("whispHavenUser");
+          
+          // Create new user profile with random avatar/emoji
+          const { avatar, emoji } = generateRandomAvatar();
+          user = {
+            id: session.user.id,
+            name: session.user.user_metadata?.full_name || "Anonymous Pookie",
+            email: session.user.email || "",
+            avatar,
+            emoji,
+            isIncognito: false,
+          };
+        }
+      } else {
+        // Create new user profile with random avatar/emoji
+        const { avatar, emoji } = generateRandomAvatar();
+        user = {
+          id: session.user.id,
+          name: session.user.user_metadata?.full_name || "Anonymous Pookie",
+          email: session.user.email || "",
+          avatar,
+          emoji,
+          isIncognito: false,
+        };
+      }
       
-      // Store in localStorage for persistence
-      localStorage.setItem("whispHavenUser", JSON.stringify(user));
+      // Store user in memory and localStorage
       currentUser = user;
+      localStorage.setItem("whispHavenUser", JSON.stringify(user));
       
-      toast.success("Logged in successfully!");
-      resolve(user);
-    }, 1000);
-  });
-};
-
-export const logout = (): Promise<void> => {
-  return new Promise((resolve) => {
-    // Simulate API call
-    setTimeout(() => {
-      localStorage.removeItem("whispHavenUser");
-      currentUser = null;
-      resolve();
-    }, 500);
-  });
-};
-
-export const deleteAccount = (): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    try {
-      // Clear user data
-      localStorage.removeItem("whispHavenUser");
-      
-      // Clear user's posts
-      const posts = JSON.parse(localStorage.getItem("whispHaven_posts") || "[]");
-      const userId = currentUser?.id;
-      const filteredPosts = posts.filter((post: any) => post.userId !== userId);
-      localStorage.setItem("whispHaven_posts", JSON.stringify(filteredPosts));
-      
-      // Clear user reactions and likes
-      localStorage.removeItem("whispHaven_liked_posts");
-      localStorage.removeItem("whispHaven_user_reactions");
-      
-      // Clear user comments
-      localStorage.removeItem("whispHaven_comments");
-      
-      currentUser = null;
-      resolve();
-    } catch (error) {
-      reject(error);
-    }
-  });
-};
-
-export const toggleIncognitoMode = (): Promise<User> => {
-  return new Promise((resolve, reject) => {
-    if (!currentUser) {
-      reject(new Error("No user logged in"));
-      return;
-    }
-
-    try {
-      currentUser.isIncognito = !currentUser.isIncognito;
-      localStorage.setItem("whispHavenUser", JSON.stringify(currentUser));
-      resolve(currentUser);
-    } catch (error) {
-      reject(error);
-    }
-  });
-};
-
-export const getCurrentUser = (): Promise<User | null> => {
-  return new Promise((resolve) => {
-    // First check if we have the user in memory
-    if (currentUser) {
-      resolve(currentUser);
-      return;
+      return user;
     }
     
-    // Otherwise check localStorage
-    const storedUser = localStorage.getItem("whispHavenUser");
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser) as User;
-        currentUser = user;
-        resolve(user);
-      } catch (error) {
-        console.error("Error parsing stored user:", error);
-        localStorage.removeItem("whispHavenUser");
-        resolve(null);
-      }
-    } else {
-      resolve(null);
-    }
-  });
+    return null;
+  } catch (error) {
+    console.error("Error getting current user:", error);
+    return null;
+  }
 };

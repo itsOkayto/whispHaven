@@ -7,6 +7,7 @@ import { ImagePlus, X, Send, Loader2 } from 'lucide-react';
 import { createPost } from '@/services/posts';
 import { toast } from 'sonner';
 import { getCurrentUser } from '@/services/auth';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CreatePostFormProps {
   onPostCreated: () => void;
@@ -68,10 +69,6 @@ const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     try {
       setIsSubmitting(true);
       
-      // In a real app, upload the media file to storage and get a URL
-      // For demo purposes, we'll just use the preview as the URL
-      const mediaUrl = mediaPreview;
-      
       // Get current user
       const currentUser = await getCurrentUser();
       
@@ -80,11 +77,38 @@ const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
         return;
       }
       
+      // If we have a media file, upload it to Supabase storage
+      let mediaUrl = undefined;
+      
+      if (mediaFile) {
+        // Create a unique file name using UUID v4
+        const fileName = `${Date.now()}_${mediaFile.name.replace(/\s+/g, '_')}`;
+        const filePath = `posts/${currentUser.id}/${fileName}`;
+        
+        // Upload file to Supabase
+        const { data: storageData, error: storageError } = await supabase
+          .storage
+          .from('media')
+          .upload(filePath, mediaFile);
+        
+        if (storageError) {
+          throw storageError;
+        }
+        
+        // Get public URL for the uploaded file
+        const { data: publicUrlData } = supabase
+          .storage
+          .from('media')
+          .getPublicUrl(filePath);
+        
+        mediaUrl = publicUrlData.publicUrl;
+      }
+      
       await createPost({
         content: content.trim(),
-        mediaUrl: mediaUrl || undefined,
+        mediaUrl: mediaUrl,
         mediaType: mediaType || undefined,
-      }, currentUser); // Pass the entire user object instead of just the ID
+      }, currentUser);
       
       toast.success("Post created successfully!");
       
