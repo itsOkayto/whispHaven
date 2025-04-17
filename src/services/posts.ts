@@ -1,40 +1,5 @@
-import { User } from '@/types/supabase';
-import { Post, Comment, ReactionType, PostType } from '@/types/supabase';
 import { supabase } from '@/integrations/supabase/client';
-
-export interface Post {
-  id: string;
-  content: string;
-  mediaUrl?: string;
-  mediaType?: 'image' | 'video' | 'text';
-  createdAt: Date;
-  likes: number;
-  comments: number;
-  userId?: string;
-  userAvatar?: string;
-  userEmoji?: string;
-  reactions?: {
-    happy: number;
-    sad: number;
-    angry: number;
-    surprised: number;
-  };
-  isFlagged?: boolean;
-  isPookieOfDay?: boolean;
-}
-
-export interface Comment {
-  id: string;
-  postId: string;
-  content: string;
-  createdAt: Date;
-  userId?: string;
-  userAvatar?: string;
-  userEmoji?: string;
-}
-
-export type ReactionType = 'happy' | 'sad' | 'angry' | 'surprised';
-export type PostType = 'image' | 'video' | 'text' | 'all';
+import { User, Post, Comment, ReactionType, PostType } from '@/types/supabase';
 
 const MOCK_POSTS: Post[] = [
   {
@@ -123,7 +88,6 @@ const filterProfanity = (text: string): string => {
   return filteredText;
 };
 
-// Posts storage and retrieval
 const getStoredPosts = (): Post[] => {
   const stored = localStorage.getItem(POSTS_STORAGE_KEY);
   if (stored) {
@@ -166,7 +130,6 @@ export const getPosts = (type?: PostType, reaction?: ReactionType): Promise<Post
   });
 };
 
-// Pookie of the Day selection
 const updatePookieOfDay = (posts: Post[]): Post[] => {
   // Reset all posts
   posts.forEach(post => post.isPookieOfDay = false);
@@ -383,7 +346,6 @@ export const addReaction = (postId: string, reactionType: ReactionType, userId: 
   });
 };
 
-// Comments functionality
 const getStoredComments = (): Comment[] => {
   const stored = localStorage.getItem(COMMENTS_STORAGE_KEY);
   if (stored) {
